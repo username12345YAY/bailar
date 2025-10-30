@@ -1,50 +1,44 @@
 // server.js
 const express = require("express");
-const { createProxyMiddleware } = require("http-proxy-middleware");
+const fetch = require("node-fetch");
 const path = require("path");
-const { createProxyServer } = require("http-proxy");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-
-// Parse JSON so we can forward it properly
 app.use(express.json());
 
-// Load your Chatbase agent ID
 const AGENT_ID = process.env.CHATBASE_AGENT_ID;
 
 if (!AGENT_ID) {
-  console.error("❌ CHATBASE_AGENT_ID not set. Add it in Render environment variables.");
+  console.error("❌ CHATBASE_AGENT_ID not set in environment variables.");
   process.exit(1);
 }
 
-// Serve static files (chat.html)
 app.use(express.static(path.join(__dirname)));
 
-// ✅ Proxy handler — correctly forwards body to Chatbase
+// ✅ New direct API call instead of proxy — more reliable for Chatbase
 app.post("/help", async (req, res) => {
-  const proxy = createProxyServer({
-    target: `https://www.chatbase.co`,
-    changeOrigin: true,
-  });
+  try {
+    console.log("🟢 Incoming request body:", req.body);
 
-  // Intercept the proxy request to send the correct body
-  proxy.on("proxyReq", (proxyReq, reqBody) => {
-    const bodyData = JSON.stringify({
-      messages: reqBody.messages,
+    const response = await fetch(`https://www.chatbase.co/api/agent/${AGENT_ID}/message`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(req.body),
     });
 
-    proxyReq.setHeader("Content-Type", "application/json");
-    proxyReq.setHeader("Content-Length", Buffer.byteLength(bodyData));
-    proxyReq.write(bodyData);
-  });
+    const data = await response.text();
+    console.log("🟣 Chatbase response:", data);
 
-  proxy.web(req, res, {
-    target: `https://www.chatbase.co/api/agent/${AGENT_ID}/message`,
-  });
+    res.status(response.status).send(data);
+  } catch (err) {
+    console.error("🔴 Error calling Chatbase:", err);
+    res.status(500).send({ error: "Failed to reach Chatbase API" });
+  }
 });
 
-// Home route
 app.get("/", (req, res) => {
   res.send(`
     <h1>✅ Sagitarius Proxy Server Running</h1>
@@ -52,7 +46,4 @@ app.get("/", (req, res) => {
   `);
 });
 
-// Start server
-app.listen(PORT, () => {
-  console.log(`🚀 Sagitarius proxy server running on port ${PORT}`);
-});
+app.listen(PORT, () => console.log(`🚀 Sagitarius proxy running on port ${PORT}`));

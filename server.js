@@ -1,4 +1,4 @@
-// server.js — Sagitarius AI Proxy (Final Version)
+// server.js — Sagittarius AI Proxy (Full Final Version)
 import express from "express";
 import cors from "cors";
 import fetch from "node-fetch";
@@ -12,59 +12,81 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Allow your Google Site to access the API (CORS)
+// ✅ Only allow requests from Google Sites
 app.use(
   cors({
-    origin: "*", // You can change "*" to "https://sites.google.com" for more security
+    origin: [
+      "https://sites.google.com",         // base domain
+      "https://sites.google.com/view",    // common subdomain pattern for Google Sites
+      "https://www.google.com"            // for embedded iframes
+    ],
     methods: ["GET", "POST"],
-    allowedHeaders: ["Content-Type"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+    optionsSuccessStatus: 200
   })
 );
 
-// Parse JSON request bodies
+// Parse JSON bodies
 app.use(express.json());
 
-// Get your Chatbase Agent ID securely from environment variables
+// 🔐 Load Chatbase credentials from environment variables
 const AGENT_ID = process.env.CHATBASE_AGENT_ID;
+const API_KEY = process.env.CHATBASE_API_KEY;
 
 if (!AGENT_ID) {
-  console.error("❌ CHATBASE_AGENT_ID is not set in Render environment variables.");
+  console.error("❌ CHATBASE_AGENT_ID is not set in environment variables.");
   process.exit(1);
 }
 
-// Serve static files (like chat.html)
+if (!API_KEY) {
+  console.warn("⚠️ CHATBASE_API_KEY not found — continuing without it (for public agents only).");
+}
+
+// Serve static files (chat.html, etc.)
 app.use(express.static(path.join(__dirname)));
 
-// ✅ Main endpoint: forwards messages to Chatbase
+// ✅ Forward messages securely to Chatbase API
 app.post("/help", async (req, res) => {
   try {
     console.log("🟢 Incoming message:", req.body);
 
+    const headers = { "Content-Type": "application/json" };
+    if (API_KEY) headers["Authorization"] = `Bearer ${API_KEY}`;
+
     const response = await fetch(`https://www.chatbase.co/api/agent/${AGENT_ID}/message`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(req.body),
+      headers,
+      body: JSON.stringify(req.body)
     });
 
     const data = await response.json();
     console.log(`🟣 Chatbase responded (status ${response.status}):`, JSON.stringify(data, null, 2));
 
-    res.status(response.status).json(data);
+    // 🧠 Smart reply extraction — handles multiple Chatbase formats
+    const reply =
+      data.text ||
+      data.reply ||
+      data.response ||
+      (data.output && data.output.text) ||
+      (data.messages && data.messages[0] && data.messages[0].content) ||
+      "🤔 Sagittarius did not return any text.";
+
+    res.status(response.status).json({ text: reply });
   } catch (error) {
     console.error("🔴 Error contacting Chatbase:", error);
     res.status(500).json({ error: "Failed to reach Chatbase API" });
   }
 });
 
-// Homepage route
+// Homepage (for quick access)
 app.get("/", (req, res) => {
   res.send(`
-    <h1>✅ Sagitarius Proxy Server Running</h1>
+    <h1>✅ Sagittarius Proxy Server Running Securely</h1>
     <p>Visit <a href="/chat.html" target="_blank">Chatbox</a></p>
   `);
 });
 
 // Start server
 app.listen(PORT, () => {
-  console.log(`🚀 Sagitarius proxy running on port ${PORT}`);
+  console.log(`🚀 Sagittarius proxy running securely on port ${PORT}`);
 });

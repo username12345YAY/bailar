@@ -1,7 +1,7 @@
 // server.js
 const express = require("express");
 const { createProxyMiddleware } = require("http-proxy-middleware");
-const open = require("open"); // optional: opens browser locally (safe to leave)
+const path = require("path");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -11,15 +11,18 @@ const AGENT_ID = process.env.CHATBASE_AGENT_ID;
 
 if (!AGENT_ID) {
   console.error("❌ Error: CHATBASE_AGENT_ID is not set in environment variables.");
-  process.exit(1); // Stop the server if the ID isn't configured
+  process.exit(1);
 }
 
-// Create proxy middleware for Chatbase
+// Serve static files like chat.html
+app.use(express.static(path.join(__dirname)));
+
+// Proxy middleware for Chatbase API messages
 const chatbaseProxy = createProxyMiddleware({
-  target: "https://chatbase.co",
+  target: "https://www.chatbase.co",
   changeOrigin: true,
   pathRewrite: {
-    "^/help": `/${AGENT_ID}/help`,
+    "^/help": `/api/agent/${AGENT_ID}/message`, // correct API endpoint
   },
   proxyTimeout: 5000,
 });
@@ -31,16 +34,12 @@ app.use("/help", chatbaseProxy);
 app.get("/", (req, res) => {
   res.send(`
     <h1>✅ Chatbase Proxy Server Running</h1>
-    <p>Try visiting <a href="/help" target="_blank">/help</a> to test the Chatbase proxy.</p>
+    <p>Try the chatbox at <a href="/chat.html" target="_blank">/chat.html</a></p>
     <p>Server is running with agent ID: <code>${AGENT_ID}</code></p>
   `);
 });
 
-// Start server
-app.listen(PORT, async () => {
+// Start the server
+app.listen(PORT, () => {
   console.log(`🚀 Server listening on port ${PORT}`);
-  // Only open the browser if running locally (Render ignores this safely)
-  if (process.env.RENDER === undefined) {
-    await open(`http://localhost:${PORT}`);
-  }
 });

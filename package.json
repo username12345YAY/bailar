@@ -1,15 +1,15 @@
 {
   "name": "chatbase-proxy",
   "version": "1.0.0",
-  "description": "A simple Express proxy server for Chatbase, hosted on Render.",
+  "description": "A modern Express server for Chatbase (Sagitarius AI Assistant) hosted on Render.",
   "main": "server.js",
+  "type": "module",
   "scripts": {
     "start": "node server.js"
   },
   "dependencies": {
     "express": "^4.19.2",
-    "http-proxy-middleware": "^3.0.0",
-    "open": "^9.1.0"
+    "node-fetch": "^3.3.2"
   },
   "engines": {
     "node": ">=18.x"
